@@ -10,10 +10,8 @@ import {
 import type { IRecruitmentTrackerProps } from './IRecruitmentTrackerProps';
 import { PostJobForm } from './PostJob/PostJobForm';
 import { TrackProgress } from './TrackProgress/TrackProgress';
-import { OngoingPositions } from './OngoingPositions/OngoingPositions';
 import { CompletedJobs } from './CompletedJobs/CompletedJobs';
 import { AllCandidates } from './AllCandidates/AllCandidates';
-import { MyInterviews } from './MyInterviews/MyInterviews';
 import { isHREmail } from './shared/EmailService';
 import { SpService } from './shared/SpService';
 
@@ -55,15 +53,16 @@ export default class RecruitmentTracker extends React.Component<
   }
 
   private async _checkPermissions(email: string): Promise<void> {
+    const defaultTab = isHREmail(email) ? 'trackProgress' : '';
     try {
       const allowed = await this._spService.isAllowedPoster(email);
       this.setState({
         isAllowedPoster: allowed,
         checkingPermissions: false,
-        activeTab: allowed ? 'postJob' : 'ongoingPositions',
+        activeTab: allowed ? 'postJob' : defaultTab,
       });
     } catch {
-      this.setState({ isAllowedPoster: false, checkingPermissions: false, activeTab: 'ongoingPositions' });
+      this.setState({ isAllowedPoster: false, checkingPermissions: false, activeTab: defaultTab });
     }
   }
 
@@ -113,7 +112,7 @@ export default class RecruitmentTracker extends React.Component<
         {/* Tab navigation */}
         <Pivot
           selectedKey={activeTab}
-          onLinkClick={item => item && this.setState({ activeTab: item.props.itemKey ?? 'ongoingPositions' })}
+          onLinkClick={item => item && this.setState({ activeTab: item.props.itemKey ?? '' })}
           styles={{
             root: { paddingLeft: 16 },
             link: { selectors: { '&.ms-Pivot-link.is-selected': { borderBottomColor: '#fd800b', color: '#fd800b' } } },
@@ -130,16 +129,6 @@ export default class RecruitmentTracker extends React.Component<
               />
             </PivotItem>
           )}
-
-          {/* Visible to everyone */}
-          <PivotItem headerText="Ongoing Positions" itemKey="ongoingPositions" itemIcon="Briefcase">
-            <OngoingPositions sp={sp} graphService={graphService} currentUser={currentUser} applyBaseUrl={applyBaseUrl} />
-          </PivotItem>
-
-          {/* Visible to everyone — shows only interviews assigned to this user */}
-          <PivotItem headerText="My Interviews" itemKey="myInterviews" itemIcon="Calendar">
-            <MyInterviews sp={sp} currentUser={currentUser} />
-          </PivotItem>
 
           {/* HR-only tabs */}
           {isHR && (
