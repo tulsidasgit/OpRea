@@ -119,9 +119,9 @@ export default class RecruitmentTracker extends React.Component<
             link: { selectors: { '&.ms-Pivot-link.is-selected': { borderBottomColor: '#fd800b', color: '#fd800b' } } },
           }}
         >
-          {/* Only AllowedPosters see the Create Job Description tab */}
+          {/* Only AllowedPosters see the Add Job Description tab */}
           {isAllowedPoster && (
-            <PivotItem headerText="Create Job Description" itemKey="postJob" itemIcon="Add">
+            <PivotItem headerText="Add Job Description" itemKey="postJob" itemIcon="Add">
               <PostJobForm
                 sp={sp}
                 graphService={graphService}

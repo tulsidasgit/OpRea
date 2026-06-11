@@ -7,7 +7,6 @@ import {
   MessageBar,
   MessageBarType,
   ActionButton,
-  ProgressIndicator,
 } from '@fluentui/react';
 import { SPFI } from '@pnp/sp';
 import { SpService } from '../shared/SpService';
@@ -26,21 +25,6 @@ interface IAllCandidatesState {
   loading: boolean;
   error: string;
   expandedCategories: Set<CandidateCategory>;
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 75) return '#107c10';
-  if (score >= 50) return '#f7630c';
-  return '#a80000';
-}
-
-function getRecommendationClass(recommendation: string): string {
-  switch (recommendation) {
-    case 'Recommended':     return styles.chipGreen;
-    case 'Maybe':           return styles.chipBlue;
-    case 'Not Recommended': return styles.chipRed;
-    default:                return styles.chipGrey;
-  }
 }
 
 export class AllCandidates extends React.Component<IAllCandidatesProps, IAllCandidatesState> {
@@ -115,39 +99,6 @@ export class AllCandidates extends React.Component<IAllCandidatesProps, IAllCand
             )}
           </Stack>
         </Stack>
-
-        <div className={styles.scoreRow}>
-          <Text
-            variant="small"
-            styles={{ root: { color: getScoreColor(candidate.fitmentScore), fontWeight: 600, minWidth: 44 } }}
-          >
-            {candidate.fitmentScore}%
-          </Text>
-          <div style={{ flex: 1 }}>
-            <ProgressIndicator
-              percentComplete={candidate.fitmentScore / 100}
-              barHeight={8}
-              styles={{
-                itemProgress: { padding: 0 },
-                progressBar: { backgroundColor: getScoreColor(candidate.fitmentScore) },
-              }}
-            />
-          </div>
-          {candidate.recommendation && (
-            <span className={`${styles.chip} ${getRecommendationClass(candidate.recommendation)}`}>
-              {candidate.recommendation}
-            </span>
-          )}
-          {candidate.experienceMatch && (
-            <span className={`${styles.chip} ${
-              candidate.experienceMatch === 'meets'   ? styles.chipGreen :
-              candidate.experienceMatch === 'exceeds' ? styles.chipBlue  :
-              styles.chipRed
-            }`}>
-              Exp: {candidate.experienceMatch}
-            </span>
-          )}
-        </div>
       </div>
     );
   }
@@ -200,8 +151,8 @@ export class AllCandidates extends React.Component<IAllCandidatesProps, IAllCand
     const { candidates, interviews, loading, error } = this.state;
 
     const grouped: Record<CandidateCategory, ICandidate[]> = {
-      'Received': [], 'Screened': [], 'Round 1': [], 'Round 2': [],
-      'HR Discussion': [], 'Final Discussion': [], 'Rejected': [],
+      'Received': [], 'Round 1': [], 'Round 2': [],
+      'HR Discussion': [], 'Rejected': [],
     };
     candidates.forEach(c => { grouped[deriveCategory(c, interviews)].push(c); });
 

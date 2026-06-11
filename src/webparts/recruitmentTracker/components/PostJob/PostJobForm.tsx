@@ -21,7 +21,6 @@ import { SPFI } from '@pnp/sp';
 import { SpService } from '../shared/SpService';
 import { GraphService } from '../shared/GraphService';
 import { EmailService } from '../shared/EmailService';
-import { AIService } from '../shared/AIService';
 import { IDepartment, IJobTitle, ICurrentUser, IJobOpening } from '../shared/models';
 import styles from './PostJobForm.module.scss';
 
@@ -64,7 +63,7 @@ interface IPostJobFormState {
 
   // JD Panel
   showJDPanel: boolean;
-  generatingJD: boolean;
+  creatingJob: boolean;
   jobDescription: string;
   jdError: string;
   applyUrl: string;
@@ -103,7 +102,6 @@ const JOB_TYPE_OPTIONS: IDropdownOption[] = [
 export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobFormState> {
   private _spService: SpService;
   private _emailService: EmailService;
-  private _aiService: AIService;
   private _mustHaveInputRef = React.createRef<HTMLInputElement>();
   private _goodToHaveInputRef = React.createRef<HTMLInputElement>();
 
@@ -111,7 +109,6 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
     super(props);
     this._spService = new SpService(props.sp);
     this._emailService = new EmailService(props.graphService);
-    this._aiService = new AIService();
     this.state = {
       checkingPermission: true,
       isAllowedPoster: false,
@@ -135,7 +132,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
       error: '',
       successJobRef: undefined,
       showJDPanel: false,
-      generatingJD: false,
+      creatingJob: false,
       jobDescription: '',
       jdError: '',
       applyUrl: '',
@@ -292,7 +289,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
   // ── JD Panel ────────────────────────────────────────────────────────────────
 
   private async _openJDPanel(): Promise<void> {
-    this.setState({ showJDPanel: true, generatingJD: true, jdError: '', jobDescription: '' });
+    this.setState({ showJDPanel: true, creatingJob: true, jdError: '', jobDescription: '' });
     try {
       const {
         selectedJobTitleName, selectedDeptName, jobLocation, jobType,
@@ -300,8 +297,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
         pendingJobId,
       } = this.state;
 
-      // Step 1 — Create the job opening immediately so we have a real jobId for the apply URL.
-      // If we already created it (Regenerate clicked), reuse the existing id.
+      // Create the job opening immediately so we have a real jobId for the apply URL.
       let jobId = pendingJobId;
       let builtApplyUrl = this.state.applyUrl;
 
@@ -321,7 +317,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
         };
         jobId = await this._spService.createJobOpening(jobPayload);
 
-        // Step 2 — Build and persist the apply URL now that we have the real jobId
+        // Build and persist the apply URL now that we have the real jobId
         builtApplyUrl = this.props.applyBaseUrl
           ? `${this.props.applyBaseUrl.replace(/\/$/, '')}/apply?jobId=${jobId}`
           : '';
@@ -333,22 +329,9 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
         this.setState({ pendingJobId: jobId, applyUrl: builtApplyUrl });
       }
 
-      // Step 3 — Generate the JD with the real URL already embedded
-      const templateText = await this._spService.getJDTemplateText();
-      const jd = await this._aiService.generateJobDescription(templateText, {
-        jobTitle: selectedJobTitleName,
-        department: selectedDeptName,
-        jobLocation,
-        jobType,
-        mustHaveSkills: mustHaveSkills.join(', '),
-        goodToHaveSkills: goodToHaveSkills.join(', '),
-        experience,
-        applyUrl: builtApplyUrl || undefined,
-      });
-
-      this.setState({ generatingJD: false, jobDescription: jd });
+      this.setState({ creatingJob: false, jobDescription: '' });
     } catch (err) {
-      this.setState({ generatingJD: false, jdError: (err as Error).message });
+      this.setState({ creatingJob: false, jdError: (err as Error).message });
     }
   }
 
@@ -485,7 +468,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
     return (
       <>
       <div className={styles.container}>
-        <p className={styles.formTitle}>Create Job Description</p>
+        <p className={styles.formTitle}>Add Job Description</p>
         <p className={styles.formSubtitle}>
           Posting as <strong>{this.props.currentUser.displayName}</strong>
         </p>
@@ -587,7 +570,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
           {/* Actions */}
           <div className={styles.actions}>
             <PrimaryButton
-              text="Generate Job Description"
+              text="Add Job Description"
               iconProps={{ iconName: 'EditNote' }}
               onClick={() => { this._openJDPanel().catch(err => this.setState({ jdError: String(err) })); }}
               disabled={!this._isFormValid() || submitting}
@@ -610,7 +593,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
   }
 
   private _renderJDPanel(): React.ReactNode {
-    const { showJDPanel, generatingJD, jobDescription, jdError, submitting,
+    const { showJDPanel, creatingJob, jobDescription, jdError, submitting,
             selectedJobTitleName, selectedDeptName, jobLocation, jobType, experience,
             applyUrl, linkCopied, savingJD, jdSaved } = this.state;
     if (!showJDPanel) return null;
@@ -627,13 +610,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
         onDismiss={() => this.setState({ showJDPanel: false })}
         isFooterAtBottom
         onRenderFooterContent={() => (
-          <div className={styles.jdPanelFooter}>
-            <DefaultButton
-              text="Regenerate"
-              iconProps={{ iconName: 'Refresh' }}
-              onClick={() => { this._openJDPanel().catch(err => this.setState({ jdError: String(err) })); }}
-              disabled={generatingJD || submitting}
-            />
+          <div className={styles.jdPanelFooter} style={{ justifyContent: 'flex-end' }}>
             <Stack horizontal tokens={{ childrenGap: 8 }}>
               <DefaultButton
                 text="Cancel"
@@ -644,13 +621,13 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
                 text={savingJD ? 'Saving…' : (jdSaved ? '✓ Saved' : 'Save JD')}
                 iconProps={{ iconName: 'Save' }}
                 onClick={() => { this._onSaveJD().catch(err => this.setState({ jdError: String(err) })); }}
-                disabled={generatingJD || submitting || savingJD || !jobDescription.trim()}
+                disabled={creatingJob || submitting || savingJD || !jobDescription.trim()}
               />
               <PrimaryButton
                 text={submitting ? 'Posting…' : 'Post Job'}
                 iconProps={{ iconName: 'Send' }}
                 onClick={() => { this._onPostJob().catch(err => this.setState({ jdError: String(err) })); }}
-                disabled={generatingJD || submitting || savingJD || !jobDescription.trim()}
+                disabled={creatingJob || submitting || savingJD || !jobDescription.trim()}
               />
               {(submitting || savingJD) && <Spinner size={SpinnerSize.small} />}
             </Stack>
@@ -704,13 +681,10 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
           </MessageBar>
         )}
 
-        {generatingJD ? (
+        {creatingJob ? (
           <div className={styles.jdGenerating}>
             <Spinner size={SpinnerSize.large} />
-            <Text variant="medium">Generating job description…</Text>
-            <Text variant="small" styles={{ root: { color: '#605e5c' } }}>
-              Reading your template and crafting content with AI
-            </Text>
+            <Text variant="medium">Creating job opening…</Text>
           </div>
         ) : (
           <>
@@ -729,7 +703,7 @@ export class PostJobForm extends React.Component<IPostJobFormProps, IPostJobForm
                 },
                 fieldGroup: { minHeight: 480 },
               }}
-              placeholder="Job description will appear here…"
+              placeholder="Write the job description here…"
             />
             <div className={styles.jdWordCount}>
               {wordCount} words

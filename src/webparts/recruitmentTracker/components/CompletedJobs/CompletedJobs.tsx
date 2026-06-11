@@ -7,7 +7,6 @@ import {
   MessageBar,
   MessageBarType,
   ActionButton,
-  ProgressIndicator,
   Panel,
   PanelType,
   PrimaryButton,
@@ -34,41 +33,10 @@ interface ICompletedJobsState {
   loadingReport: boolean;
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 75) return '#107c10';
-  if (score >= 50) return '#f7630c';
-  return '#a80000';
-}
-
-function getRecommendationClass(recommendation: string): string {
-  switch (recommendation) {
-    case 'Recommended':     return styles.badgeGreen;
-    case 'Maybe':           return styles.badgeOrange;
-    case 'Not Recommended': return styles.badgeRed;
-    default:                return styles.badgeGrey;
-  }
-}
-
 function getOutcome(candidate: ICandidate): { label: string; cssClass: string } {
-  if (candidate.applicationStatus === 'Rejected') {
-    return { label: 'Rejected', cssClass: styles.badgeRed };
-  }
-  if (candidate.recommendation === 'Recommended') {
-    return { label: 'Selected', cssClass: styles.badgeGreen };
-  }
-  return { label: 'Not Selected', cssClass: styles.badgeGrey };
-}
-
-function renderSkillChips(skills: string, chipClass: string): React.ReactNode {
-  const list = skills.split(',').map(s => s.trim()).filter(Boolean);
-  if (list.length === 0) return null;
-  return (
-    <div className={styles.chipRow}>
-      {list.map(s => (
-        <span key={s} className={`${styles.chip} ${chipClass}`}>{s}</span>
-      ))}
-    </div>
-  );
+  return candidate.applicationStatus === 'Rejected'
+    ? { label: 'Rejected', cssClass: styles.badgeRed }
+    : { label: 'Active', cssClass: styles.badgeGrey };
 }
 
 function csvEscape(value: string): string {
@@ -96,8 +64,7 @@ function summarizeInterviews(candidateId: number, interviews: IInterview[]): str
 function buildCsv(job: IJobOpening, candidates: ICandidate[], interviews: IInterview[]): string {
   const header = [
     'Candidate Name', 'Email', 'Phone', 'Outcome', 'Application Status',
-    'Fitment Score', 'Recommendation', 'Experience Match',
-    'Matching Skills', 'Missing Skills', 'AI Summary', 'HR Feedback', 'Interviews',
+    'HR Feedback', 'Interviews',
   ];
 
   const rows = candidates.map(c => [
@@ -106,12 +73,6 @@ function buildCsv(job: IJobOpening, candidates: ICandidate[], interviews: IInter
     c.phone,
     getOutcome(c).label,
     c.applicationStatus ?? '',
-    String(c.fitmentScore),
-    c.recommendation,
-    c.experienceMatch,
-    c.matchingSkills,
-    c.missingSkills,
-    c.aiSummary,
     c.hrFeedback,
     summarizeInterviews(c.id, interviews),
   ]);
@@ -146,19 +107,6 @@ function fmtDate(iso: string | undefined): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function scoreHex(score: number): string {
-  if (score >= 75) return '#107c10';
-  if (score >= 50) return '#f7630c';
-  return score > 0 ? '#a80000' : '#605e5c';
-}
-
-function recColor(rec: string): { bg: string; fg: string } {
-  if (rec === 'Recommended')     return { bg: '#dff6dd', fg: '#107c10' };
-  if (rec === 'Maybe')           return { bg: '#fff4ce', fg: '#8a8000' };
-  if (rec === 'Not Recommended') return { bg: '#fde7e9', fg: '#a80000' };
-  return { bg: '#edebe9', fg: '#605e5c' };
-}
-
 function buildReportHtml(job: IJobOpening, candidates: ICandidate[], interviews: IInterview[]): string {
   const generatedAt = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -179,21 +127,11 @@ function buildReportHtml(job: IJobOpening, candidates: ICandidate[], interviews:
       </div>`;
   }).join('');
 
-  // Skills chips inline helper
-  const skillChips = (skills: string, bg: string, fg: string): string =>
-    skills
-      ? skills.split(',').map(s => s.trim()).filter(Boolean)
-          .map(s => `<span style="display:inline-block;background:${bg};color:${fg};padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600;margin:1px 2px 1px 0">${escHtml(s)}</span>`)
-          .join('')
-      : '<span style="color:#605e5c;font-size:11px">—</span>';
-
   // Candidate rows
   const candidateRowsHtml = candidates.map((c, idx) => {
     const stage = deriveCategory(c, interviews);
     const { color: stageColor } = CATEGORY_CONFIG[stage];
     const { label: stageLabel } = CATEGORY_CONFIG[stage];
-    const sc = scoreHex(c.fitmentScore);
-    const rc = recColor(c.recommendation);
     const mine = interviews
       .filter(iv => iv.candidateId === c.id)
       .sort((a, b) => parseInt(a.interviewRound, 10) - parseInt(b.interviewRound, 10));
@@ -222,15 +160,6 @@ function buildReportHtml(job: IJobOpening, candidates: ICandidate[], interviews:
         </td>
         <td style="padding:10px 12px;border-bottom:1px solid #edebe9;vertical-align:top">
           <span style="background:${stageColor};color:#fff;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap">${escHtml(stageLabel)}</span>
-        </td>
-        <td style="padding:10px 12px;border-bottom:1px solid #edebe9;vertical-align:top">
-          <span style="background:${sc};color:#fff;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:800;display:inline-block">${c.fitmentScore > 0 ? c.fitmentScore + '%' : '—'}</span>
-          <div style="margin-top:6px">${skillChips(c.matchingSkills, '#dff6dd', '#107c10')}</div>
-          <div style="margin-top:3px">${skillChips(c.missingSkills, '#fde7e9', '#a80000')}</div>
-        </td>
-        <td style="padding:10px 12px;border-bottom:1px solid #edebe9;vertical-align:top">
-          ${c.recommendation ? `<span style="background:${rc.bg};color:${rc.fg};padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600">${escHtml(c.recommendation)}</span>` : '<span style="color:#605e5c;font-size:11px">—</span>'}
-          ${c.aiSummary ? `<div style="margin-top:6px;font-size:11px;color:#323130;line-height:1.5">${escHtml(c.aiSummary)}</div>` : ''}
         </td>
         <td style="padding:10px 12px;border-bottom:1px solid #edebe9;vertical-align:top">${ivHtml}</td>
       </tr>`;
@@ -308,13 +237,11 @@ function buildReportHtml(job: IJobOpening, candidates: ICandidate[], interviews:
         <tr style="background:#f3f2f1">
           <th style="padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#605e5c;font-weight:700">Candidate</th>
           <th style="padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#605e5c;font-weight:700">Stage</th>
-          <th style="padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#605e5c;font-weight:700">Score &amp; Skills</th>
-          <th style="padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#605e5c;font-weight:700">AI Assessment</th>
           <th style="padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#605e5c;font-weight:700">Interviews</th>
         </tr>
       </thead>
       <tbody>
-        ${candidateRowsHtml || `<tr><td colspan="5" style="padding:16px 12px;color:#605e5c;text-align:center">No candidates recorded for this job.</td></tr>`}
+        ${candidateRowsHtml || `<tr><td colspan="3" style="padding:16px 12px;color:#605e5c;text-align:center">No candidates recorded for this job.</td></tr>`}
       </tbody>
     </table>
   </div>
@@ -547,8 +474,6 @@ export class CompletedJobs extends React.Component<ICompletedJobsProps, IComplet
                   candidates.map(c => {
                     const stage = deriveCategory(c, interviews);
                     const { label: stageLabel, color: stageColor } = CATEGORY_CONFIG[stage];
-                    const sc = scoreHex(c.fitmentScore);
-                    const rc = recColor(c.recommendation);
                     return (
                       <div key={c.id} style={{ padding: '10px 12px', borderRadius: 4, marginBottom: 6, background: '#faf9f8', border: '1px solid #edebe9' }}>
                         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
@@ -557,14 +482,6 @@ export class CompletedJobs extends React.Component<ICompletedJobsProps, IComplet
                             <div style={{ fontSize: 11, color: '#605e5c' }}>{c.email}</div>
                           </div>
                           <span style={{ background: stageColor, color: '#fff', padding: '2px 9px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>{stageLabel}</span>
-                          <span style={{ background: sc, color: '#fff', padding: '2px 9px', borderRadius: 10, fontSize: 12, fontWeight: 800 }}>
-                            {c.fitmentScore > 0 ? `${c.fitmentScore}%` : '—'}
-                          </span>
-                          {c.recommendation && (
-                            <span style={{ background: rc.bg, color: rc.fg, padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
-                              {c.recommendation}
-                            </span>
-                          )}
                         </div>
                         {c.hrFeedback && (
                           <div style={{ marginTop: 6, padding: '5px 8px', background: '#fff4ce', borderLeft: '3px solid #f7630c', borderRadius: '0 3px 3px 0', fontSize: 12 }}>
@@ -602,49 +519,8 @@ export class CompletedJobs extends React.Component<ICompletedJobsProps, IComplet
           </Stack>
           <Stack horizontal tokens={{ childrenGap: 6 }}>
             <span className={`${styles.badge} ${outcome.cssClass}`}>{outcome.label}</span>
-            <span className={`${styles.badge} ${getRecommendationClass(candidate.recommendation)}`}>
-              {candidate.recommendation || 'Pending'}
-            </span>
           </Stack>
         </Stack>
-
-        <div className={styles.scoreRow}>
-          <Text
-            variant="small"
-            styles={{ root: { color: getScoreColor(candidate.fitmentScore), fontWeight: 600, minWidth: 44 } }}
-          >
-            {candidate.fitmentScore}%
-          </Text>
-          <div style={{ flex: 1 }}>
-            <ProgressIndicator
-              percentComplete={candidate.fitmentScore / 100}
-              barHeight={8}
-              styles={{
-                itemProgress: { padding: 0 },
-                progressBar: { backgroundColor: getScoreColor(candidate.fitmentScore) },
-              }}
-            />
-          </div>
-          {candidate.experienceMatch && (
-            <span className={`${styles.chip} ${
-              candidate.experienceMatch === 'meets'   ? styles.chipGreen :
-              candidate.experienceMatch === 'exceeds' ? styles.chipBlue  :
-              styles.chipRed
-            }`}>
-              Exp: {candidate.experienceMatch}
-            </span>
-          )}
-        </div>
-
-        {candidate.matchingSkills && renderSkillChips(candidate.matchingSkills, styles.chipGreen)}
-        {candidate.missingSkills && renderSkillChips(candidate.missingSkills, styles.chipRed)}
-
-        {candidate.aiSummary && (
-          <div className={styles.aiSummary}>
-            <Text variant="xSmall" styles={{ root: { color: '#0078d4', fontWeight: 600 } }}>AI Summary</Text>
-            <Text variant="small">{candidate.aiSummary}</Text>
-          </div>
-        )}
 
         {candidate.hrFeedback && (
           <div style={{ marginTop: 8 }}>

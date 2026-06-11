@@ -53,20 +53,6 @@
   background: #faf9f8;
 }
 
-.scoreRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 8px 0;
-}
-
-.chipRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-
 .chip {
   display: inline-block;
   padding: 2px 8px;
@@ -76,27 +62,11 @@
 }
 
 .chipGreen  { background: #dff6dd; color: #107c10; }
-.chipRed    { background: #fde7e9; color: #a80000; }
-.chipBlue   { background: #deecf9; color: #0078d4; }
 .chipGrey   { background: #edebe9; color: #605e5c; }
 
 .badge       { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-.badgeGreen  { background: #dff6dd; color: #107c10; }
-.badgeOrange { background: #fff4ce; color: #8a8000; }
 .badgeRed    { background: #fde7e9; color: #a80000; }
 .badgeGrey   { background: #edebe9; color: #605e5c; }
-
-.aiSummary {
-  background: #f0f6ff;
-  border-left: 3px solid #0078d4;
-  padding: 8px 12px;
-  border-radius: 0 4px 4px 0;
-  margin: 8px 0;
-
-  > * + * {
-    margin-top: 4px;
-  }
-}
 
 // ── Interview history ────────────────────────────────────────────────────────
 

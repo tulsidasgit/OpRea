@@ -19,7 +19,6 @@ import { SPFI } from '@pnp/sp';
 import { SpService } from '../shared/SpService';
 import { GraphService } from '../shared/GraphService';
 import { EmailService } from '../shared/EmailService';
-import { AIService } from '../shared/AIService';
 import { IJobOpening, ICandidate, IInterview } from '../shared/models';
 import { CATEGORY_ORDER, CATEGORY_CONFIG, deriveCategory } from '../shared/candidateCategory';
 import { CandidateCard } from './CandidateCard';
@@ -63,13 +62,11 @@ function getStatusClass(status: IJobOpening['status']): string {
 export class TrackProgress extends React.Component<ITrackProgressProps, ITrackProgressState> {
   private _spService: SpService;
   private _emailService: EmailService;
-  private _aiService: AIService;
 
   constructor(props: ITrackProgressProps) {
     super(props);
     this._spService = new SpService(props.sp);
     this._emailService = new EmailService(props.graphService);
-    this._aiService = new AIService();
     this.state = {
       jobs: [],
       loadingJobs: true,
@@ -206,13 +203,6 @@ export class TrackProgress extends React.Component<ITrackProgressProps, ITrackPr
     const candidates = candidatesMap[reportJobId] ?? [];
     const interviews = interviewsMap[reportJobId] ?? [];
 
-    const scoreColor = (score: number): string =>
-      score >= 75 ? '#107c10' : score >= 50 ? '#f7630c' : score > 0 ? '#a80000' : '#605e5c';
-    const recBg = (r: string): string =>
-      r === 'Recommended' ? '#dff6dd' : r === 'Maybe' ? '#fff4ce' : r === 'Not Recommended' ? '#fde7e9' : '#edebe9';
-    const recFg = (r: string): string =>
-      r === 'Recommended' ? '#107c10' : r === 'Maybe' ? '#8a8000' : r === 'Not Recommended' ? '#a80000' : '#605e5c';
-
     // Summary counts per category
     const categoryCounts: Partial<Record<string, number>> = {};
     candidates.forEach(c => {
@@ -301,24 +291,12 @@ export class TrackProgress extends React.Component<ITrackProgressProps, ITrackPr
                           key={c.id}
                           style={{ padding: '8px 10px', borderRadius: 4, marginBottom: 4, background: '#faf9f8', border: '1px solid #edebe9' }}
                         >
-                          {/* Name + email + badges */}
+                          {/* Name + email */}
                           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                             <div style={{ flex: 1, minWidth: 120 }}>
                               <div style={{ fontWeight: 600, fontSize: 13, color: '#323130' }}>{c.candidateName}</div>
                               <div style={{ fontSize: 11, color: '#605e5c' }}>{c.email}</div>
                             </div>
-                            <span style={{
-                              background: scoreColor(c.fitmentScore), color: '#fff',
-                              padding: '2px 10px', borderRadius: 10, fontSize: 12, fontWeight: 700,
-                              minWidth: 44, textAlign: 'center',
-                            }}>
-                              {c.fitmentScore > 0 ? `${c.fitmentScore}%` : '—'}
-                            </span>
-                            {c.recommendation && (
-                              <span style={{ background: recBg(c.recommendation), color: recFg(c.recommendation), padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
-                                {c.recommendation}
-                              </span>
-                            )}
                           </div>
 
                           {/* Interview date — Round 1 / Round 2 */}
@@ -407,7 +385,6 @@ export class TrackProgress extends React.Component<ITrackProgressProps, ITrackPr
                   job={job}
                   spService={this._spService}
                   emailService={this._emailService}
-                  aiService={this._aiService}
                   onCandidateUpdated={this._onCandidateUpdated}
                   onInterviewScheduled={() => this._refreshInterviewsForJob(job.id)}
                 />

@@ -17,7 +17,6 @@ import {
 import type { SPFI } from '@pnp/sp';
 import type { IInterview, ICandidate, IJobOpening, ICurrentUser } from '../shared/models';
 import { SpService } from '../shared/SpService';
-import { AIService } from '../shared/AIService';
 
 export interface IMyInterviewsProps {
   sp: SPFI;
@@ -34,21 +33,17 @@ interface IMyInterviewsState {
   // Feedback panel
   activeFeedbackInterview: IInterview | undefined;
   feedbackText: string;
-  polishingFeedback: boolean;
   panelError: string;
   submittingFeedback: boolean;
   submitSuccess: boolean;
-  aiPolished: boolean;
 }
 
 export class MyInterviews extends React.Component<IMyInterviewsProps, IMyInterviewsState> {
   private _spService: SpService;
-  private _aiService: AIService;
 
   constructor(props: IMyInterviewsProps) {
     super(props);
     this._spService = new SpService(props.sp);
-    this._aiService = new AIService();
     this.state = {
       loading: true,
       loadError: '',
@@ -58,11 +53,9 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
       expandedIds: {},
       activeFeedbackInterview: undefined,
       feedbackText: '',
-      polishingFeedback: false,
       panelError: '',
       submittingFeedback: false,
       submitSuccess: false,
-      aiPolished: false,
     };
   }
 
@@ -115,7 +108,6 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
       feedbackText: interview.feedback ?? '',
       panelError: '',
       submitSuccess: false,
-      aiPolished: false,
     });
   };
 
@@ -125,29 +117,7 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
       feedbackText: '',
       panelError: '',
       submitSuccess: false,
-      aiPolished: false,
     });
-  };
-
-  private _polishWithAI = async (): Promise<void> => {
-    const { activeFeedbackInterview, feedbackText, candidateMap, jobMap } = this.state;
-    if (!activeFeedbackInterview || !feedbackText.trim()) return;
-
-    const candidate = candidateMap[activeFeedbackInterview.candidateId];
-    const job = jobMap[activeFeedbackInterview.jobOpeningId];
-
-    this.setState({ polishingFeedback: true, panelError: '' });
-    try {
-      const polished = await this._aiService.polishFeedback(
-        feedbackText,
-        candidate?.candidateName ?? 'Candidate',
-        job?.jobTitle ?? 'Position',
-        activeFeedbackInterview.interviewRound
-      );
-      this.setState({ feedbackText: polished, polishingFeedback: false, aiPolished: true });
-    } catch (err) {
-      this.setState({ panelError: (err as Error).message, polishingFeedback: false });
-    }
   };
 
   private _submitFeedback = async (): Promise<void> => {
@@ -171,30 +141,6 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
       this.setState({ submittingFeedback: false, panelError: (err as Error).message });
     }
   };
-
-  private _scoreBadge(score: number): React.ReactNode {
-    const bg = score >= 75 ? '#107c10' : score >= 50 ? '#f59c00' : score === 0 ? '#8a8886' : '#a80000';
-    return (
-      <span style={{ background: bg, color: '#fff', padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-        {score === 0 ? 'Unscreened' : `${score}%`}
-      </span>
-    );
-  }
-
-  private _recBadge(rec: string): React.ReactNode {
-    if (!rec) return undefined;
-    const map: Record<string, { bg: string; fg: string }> = {
-      Recommended: { bg: '#dff6dd', fg: '#107c10' },
-      Maybe: { bg: '#fff4ce', fg: '#8a6914' },
-      'Not Recommended': { bg: '#fde7e9', fg: '#a80000' },
-    };
-    const c = map[rec] ?? { bg: '#f3f2f1', fg: '#323130' };
-    return (
-      <span style={{ background: c.bg, color: c.fg, padding: '2px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
-        {rec}
-      </span>
-    );
-  }
 
   private _renderInterviewCard(interview: IInterview): React.ReactNode {
     const { expandedIds, candidateMap, jobMap } = this.state;
@@ -285,15 +231,6 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
                   <Text styles={{ root: { fontSize: 12, color: '#605e5c' } }}>{job.department} · {job.experience}</Text>
                 </Stack>
               )}
-              {candidate && (
-                <Stack tokens={{ childrenGap: 4 }}>
-                  <Text styles={{ root: { fontSize: 11, color: '#a19f9d', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' } }}>AI Fitment</Text>
-                  <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
-                    {this._scoreBadge(candidate.fitmentScore)}
-                    {this._recBadge(candidate.recommendation)}
-                  </Stack>
-                </Stack>
-              )}
               {candidate?.resumeUrl && (
                 <Stack tokens={{ childrenGap: 2 }}>
                   <Text styles={{ root: { fontSize: 11, color: '#a19f9d', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' } }}>Resume</Text>
@@ -309,42 +246,6 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
                 </Stack>
               )}
             </Stack>
-
-            {/* Skills chips */}
-            {candidate && (candidate.matchingSkills || candidate.missingSkills) && (
-              <Stack horizontal tokens={{ childrenGap: 24 }} wrap styles={{ root: { marginBottom: 12 } }}>
-                {candidate.matchingSkills && (
-                  <Stack tokens={{ childrenGap: 4 }}>
-                    <Text styles={{ root: { fontSize: 11, color: '#107c10', fontWeight: 600, textTransform: 'uppercase' } }}>Matching Skills</Text>
-                    <Stack horizontal tokens={{ childrenGap: 6 }} wrap>
-                      {candidate.matchingSkills.split(',').map(s => s.trim()).filter(Boolean).map(s => (
-                        <span key={s} style={{ background: '#dff6dd', color: '#107c10', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 500 }}>{s}</span>
-                      ))}
-                    </Stack>
-                  </Stack>
-                )}
-                {candidate.missingSkills && (
-                  <Stack tokens={{ childrenGap: 4 }}>
-                    <Text styles={{ root: { fontSize: 11, color: '#a80000', fontWeight: 600, textTransform: 'uppercase' } }}>Missing Skills</Text>
-                    <Stack horizontal tokens={{ childrenGap: 6 }} wrap>
-                      {candidate.missingSkills.split(',').map(s => s.trim()).filter(Boolean).map(s => (
-                        <span key={s} style={{ background: '#fde7e9', color: '#a80000', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 500 }}>{s}</span>
-                      ))}
-                    </Stack>
-                  </Stack>
-                )}
-              </Stack>
-            )}
-
-            {/* AI summary */}
-            {candidate?.aiSummary && (
-              <div style={{ background: '#eff6fc', border: '1px solid #c7e0f4', borderRadius: 6, padding: '10px 14px', marginBottom: 12 }}>
-                <Text styles={{ root: { fontSize: 11, fontWeight: 600, color: '#0078d4', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 4 } }}>
-                  AI Assessment
-                </Text>
-                <Text styles={{ root: { fontSize: 13 } }}>{candidate.aiSummary}</Text>
-              </div>
-            )}
 
             {/* HR notes (from interview record) */}
             {interview.hrNotes && (
@@ -384,11 +285,9 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
     const {
       activeFeedbackInterview,
       feedbackText,
-      polishingFeedback,
       panelError,
       submittingFeedback,
       submitSuccess,
-      aiPolished,
       candidateMap,
       jobMap,
     } = this.state;
@@ -455,62 +354,34 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
                 </Text>
               )}
             </Stack>
-            {candidate && (
+            {candidate?.resumeUrl && (
               <Stack horizontal tokens={{ childrenGap: 8 }} styles={{ root: { marginTop: 10 } }}>
-                {this._scoreBadge(candidate.fitmentScore)}
-                {this._recBadge(candidate.recommendation)}
-                {candidate.resumeUrl && (
-                  <a
-                    href={candidate.resumeUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontSize: 12, color: '#0078d4', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
-                  >
-                    <Icon iconName="OpenInNewWindow" styles={{ root: { fontSize: 11 } }} />
-                    Resume
-                  </a>
-                )}
+                <a
+                  href={candidate.resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 12, color: '#0078d4', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <Icon iconName="OpenInNewWindow" styles={{ root: { fontSize: 11 } }} />
+                  Resume
+                </a>
               </Stack>
             )}
           </div>
 
           {/* Feedback textarea */}
           <Stack tokens={{ childrenGap: 6 }}>
-            <Stack horizontal horizontalAlign="space-between" verticalAlign="center">
-              <Text styles={{ root: { fontWeight: 600, fontSize: 14 } }}>
-                Your Feedback <span style={{ color: '#a80000' }}>*</span>
-              </Text>
-              {aiPolished && (
-                <span style={{ fontSize: 11, color: '#107c10', background: '#dff6dd', padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>
-                  ✨ AI Optimised
-                </span>
-              )}
-            </Stack>
+            <Text styles={{ root: { fontWeight: 600, fontSize: 14 } }}>
+              Your Feedback <span style={{ color: '#a80000' }}>*</span>
+            </Text>
             <TextField
               multiline
               rows={10}
               value={feedbackText}
-              onChange={(_e, v) => this.setState({ feedbackText: v ?? '', aiPolished: false })}
+              onChange={(_e, v) => this.setState({ feedbackText: v ?? '' })}
               placeholder="Share your observations about the candidate's technical skills, communication, problem-solving approach, depth of knowledge, and overall suitability for the role…"
               disabled={submittingFeedback}
             />
-
-            {/* Optimise with AI row */}
-            <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 10 }}>
-              <ActionButton
-                iconProps={{ iconName: 'Lightbulb' }}
-                text={polishingFeedback ? 'Optimising…' : 'Optimise with AI'}
-                disabled={polishingFeedback || !feedbackText.trim() || submittingFeedback}
-                onClick={() => { this._polishWithAI().catch(() => undefined); }}
-                styles={{ root: { color: '#0078d4', fontWeight: 600, height: 30 } }}
-              />
-              {polishingFeedback && <Spinner size={SpinnerSize.small} />}
-              {!polishingFeedback && (
-                <Text styles={{ root: { fontSize: 12, color: '#a19f9d' } }}>
-                  AI rewrites your notes professionally while keeping all observations
-                </Text>
-              )}
-            </Stack>
 
             {panelError && (
               <MessageBar
@@ -528,32 +399,6 @@ export class MyInterviews extends React.Component<IMyInterviewsProps, IMyIntervi
               </MessageBar>
             )}
           </Stack>
-
-          {/* AI screening summary for reference */}
-          {candidate?.aiSummary && (
-            <div style={{ background: '#eff6fc', border: '1px solid #c7e0f4', borderRadius: 6, padding: '10px 14px' }}>
-              <Text styles={{ root: { fontSize: 11, fontWeight: 600, color: '#0078d4', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 4 } }}>
-                AI Screening Summary (Reference)
-              </Text>
-              <Text styles={{ root: { fontSize: 12, color: '#323130' } }}>{candidate.aiSummary}</Text>
-              {(candidate.matchingSkills || candidate.missingSkills) && (
-                <Stack horizontal tokens={{ childrenGap: 16 }} wrap styles={{ root: { marginTop: 8 } }}>
-                  {candidate.matchingSkills && (
-                    <Stack tokens={{ childrenGap: 3 }}>
-                      <Text styles={{ root: { fontSize: 11, color: '#107c10', fontWeight: 600 } }}>Matching:</Text>
-                      <Text styles={{ root: { fontSize: 12 } }}>{candidate.matchingSkills}</Text>
-                    </Stack>
-                  )}
-                  {candidate.missingSkills && (
-                    <Stack tokens={{ childrenGap: 3 }}>
-                      <Text styles={{ root: { fontSize: 11, color: '#a80000', fontWeight: 600 } }}>Missing:</Text>
-                      <Text styles={{ root: { fontSize: 12 } }}>{candidate.missingSkills}</Text>
-                    </Stack>
-                  )}
-                </Stack>
-              )}
-            </div>
-          )}
 
           {/* HR notes for reference */}
           {activeFeedbackInterview.hrNotes && (

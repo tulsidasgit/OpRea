@@ -109,15 +109,6 @@ export class EmailService {
       ? new Date(interview.scheduledDate).toLocaleString('en-GB')
       : '—';
 
-    const scoreClass = candidate.fitmentScore >= 75 ? 'badge-green'
-      : candidate.fitmentScore >= 50 ? 'badge-orange' : 'badge-red';
-
-    const expClass = candidate.experienceMatch === 'exceeds' ? 'badge-green'
-      : candidate.experienceMatch === 'meets' ? 'badge-blue' : 'badge-red';
-
-    const recClass = candidate.recommendation === 'Recommended' ? 'badge-green'
-      : candidate.recommendation === 'Maybe' ? 'badge-orange' : 'badge-red';
-
     const skillChips = (skills: string, color: string): string =>
       skills
         ? skills.split(',').map(s => s.trim()).filter(Boolean)
@@ -162,31 +153,6 @@ export class EmailService {
        <div class="field"><div class="label">Phone</div><div class="value">${candidate.phone || '—'}</div></div>
        <div class="field"><div class="label">Resume</div><div class="value">${resumeLink}</div></div>
 
-       <hr class="divider"/>
-       <h2>AI Screening Report</h2>
-       <div class="field">
-         <div class="label">Fitment Score</div>
-         <div class="value">
-           <span class="badge ${scoreClass}" style="font-size:15px;padding:4px 14px">${candidate.fitmentScore}%</span>
-         </div>
-       </div>
-       <div class="field">
-         <div class="label">Recommendation</div>
-         <div class="value"><span class="badge ${recClass}">${candidate.recommendation || 'Pending'}</span></div>
-       </div>
-       <div class="field">
-         <div class="label">Experience Match</div>
-         <div class="value"><span class="badge ${expClass}">${candidate.experienceMatch || '—'}</span></div>
-       </div>
-       <div class="field"><div class="label">Matching Skills</div><div class="value">${skillChips(candidate.matchingSkills, '#dff6dd')}</div></div>
-       <div class="field"><div class="label">Missing Skills</div><div class="value">${skillChips(candidate.missingSkills, '#fde7e9')}</div></div>
-       ${candidate.aiSummary
-         ? `<div style="background:#f0f6ff;border-left:3px solid #0078d4;padding:10px 14px;border-radius:0 4px 4px 0;margin:8px 0">
-              <div style="font-size:12px;font-weight:600;color:#0078d4;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">AI Assessment</div>
-              ${candidate.aiSummary}
-            </div>`
-         : ''}
-
        ${hrFeedbackSection}
 
        <hr class="divider"/>
@@ -197,7 +163,7 @@ export class EmailService {
     await this._graph.sendEmail({
       to: [interview.interviewerEmail],
       cc: HR_EMAILS,
-      subject: `[OpRea] Interview Scheduled — ${candidate.candidateName} for ${job.title} (Round ${interview.interviewRound}) | Score: ${candidate.fitmentScore}%`,
+      subject: `[OpRea] Interview Scheduled — ${candidate.candidateName} for ${job.title} (Round ${interview.interviewRound})`,
       bodyHtml: body,
     });
   }
@@ -322,7 +288,7 @@ export class EmailService {
        <div class="field"><div class="label">Experience Required</div><div class="value">${job.experience}</div></div>
        <div class="field"><div class="label">Due Date</div><div class="value">${dueDate}</div></div>
        <hr class="divider"/>
-       <p>Please review the application in the Recruitment Tracker and run AI screening.</p>
+       <p>Please review the application in the Recruitment Tracker.</p>
        <a class="btn" href="${SITE_URL}">Open Recruitment Tracker</a>`
     );
 
@@ -331,61 +297,6 @@ export class EmailService {
       subject: referral
         ? `[OpRea] Referral: ${candidateName} → ${job.title} (by ${referral.referredBy})`
         : `[OpRea] New Application: ${candidateName} → ${job.title} (${job.department})`,
-      bodyHtml: body,
-    });
-  }
-
-  // ── 4. All resumes screened — fitment report ready ────────────────────────
-
-  public async notifyHRFitmentReady(
-    job: IJobOpening,
-    candidates: ICandidate[]
-  ): Promise<void> {
-    const topCandidates = [...candidates]
-      .sort((a, b) => b.fitmentScore - a.fitmentScore)
-      .slice(0, 5);
-
-    const rows = topCandidates
-      .map(
-        c => `<tr>
-          <td style="padding:8px 12px">${c.candidateName}</td>
-          <td style="padding:8px 12px;text-align:center">
-            <span class="badge ${c.fitmentScore >= 75 ? 'badge-green' : c.fitmentScore >= 50 ? 'badge-orange' : 'badge-red'}">
-              ${c.fitmentScore}%
-            </span>
-          </td>
-          <td style="padding:8px 12px">
-            <span class="badge ${c.recommendation === 'Recommended' ? 'badge-green' : c.recommendation === 'Maybe' ? 'badge-orange' : 'badge-red'}">
-              ${c.recommendation}
-            </span>
-          </td>
-        </tr>`
-      )
-      .join('');
-
-    const body = emailShell(
-      'Fitment Report Ready',
-      `<h2>Fitment Report Ready: ${job.title}</h2>
-       <p>AI screening is complete for all ${candidates.length} candidate(s) who applied for <strong>${job.title}</strong> in <strong>${job.department}</strong>.</p>
-       <h2>Top Candidates</h2>
-       <table style="width:100%;border-collapse:collapse;font-size:13px">
-         <thead>
-           <tr style="background:#f3f2f1">
-             <th style="padding:8px 12px;text-align:left">Candidate</th>
-             <th style="padding:8px 12px">Score</th>
-             <th style="padding:8px 12px;text-align:left">AI Recommendation</th>
-           </tr>
-         </thead>
-         <tbody>${rows}</tbody>
-       </table>
-       <hr class="divider"/>
-       <p>Open the Recruitment Tracker to review full reports, add feedback, and schedule interviews.</p>
-       <a class="btn" href="${SITE_URL}">Open Recruitment Tracker</a>`
-    );
-
-    await this._graph.sendEmail({
-      to: HR_EMAILS,
-      subject: `[OpRea] Fitment Report Ready: ${job.title} — ${candidates.length} candidate(s) screened`,
       bodyHtml: body,
     });
   }
